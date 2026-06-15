@@ -67,12 +67,31 @@ function toggleTheme() {
   renderAll();
 }
 
-// ── PROPS TOGGLE ──────────────────────────────────────────────────────────────
+// ── PROPS / SIDEBAR TOGGLE ───────────────────────────────────────────────────
 function toggleProps() {
   const p = document.getElementById('props');
   const t = document.getElementById('props-toggle');
   p.classList.toggle('closed');
-  if(t) t.innerHTML = p.classList.contains('closed') ? '&lt;' : '&gt;';
+  if(t) {
+    t.classList.toggle('closed');
+    t.innerHTML = p.classList.contains('closed') ? '&lt;' : '&gt;';
+  }
+}
+function toggleSidebar() {
+  const p = document.getElementById('sidebar');
+  const t = document.getElementById('sidebar-toggle');
+  p.classList.toggle('closed');
+  if(t) {
+    t.classList.toggle('closed');
+    t.innerHTML = p.classList.contains('closed') ? '&gt;' : '&lt;';
+  }
+}
+
+// ── EVENT COORD ABSTRACTION ──────────────────────────────────────────────────
+function getPos(e){
+  if(e.touches && e.touches.length > 0) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  if(e.changedTouches && e.changedTouches.length > 0) return {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
 }
 
 // ── TRANSFORM ──────────────────────────────────────────────────────────────────
@@ -119,25 +138,39 @@ function setTool(t){
 }
 
 // ── PAN / DRAG ─────────────────────────────────────────────────────────────────
-wrap.addEventListener('mousedown',e=>{
-  if(tool==='pan' || (e.ctrlKey && e.button === 0)){
-    isPan=true; panS={x:e.clientX,y:e.clientY}; panO={x:vx,y:vy};
-    e.preventDefault();
+function handleDown(e) {
+  if (e.type === 'mousedown' && e.button !== 0 && !e.ctrlKey) return;
+  const pos = getPos(e);
+  if(tool==='pan' || (e.ctrlKey && e.type === 'mousedown')){
+    isPan=true; panS={x:pos.x, y:pos.y}; panO={x:vx, y:vy};
+    if(e.cancelable) e.preventDefault();
   } else if(e.target===wrap||e.target===SVG||e.target.tagName==='svg'){
     setSel(null);
   }
-});
-window.addEventListener('mousemove',e=>{
-  if(isPan){vx=panO.x+(e.clientX-panS.x); vy=panO.y+(e.clientY-panS.y); applyT();}
+}
+function handleMove(e) {
+  const pos = getPos(e);
+  if(isPan){vx=panO.x+(pos.x-panS.x); vy=panO.y+(pos.y-panS.y); applyT();}
   if(isDrag&&sel){
     const n=nodes.find(n=>n.id===sel);
-    if(n){n.x=dragO.x+(e.clientX-dragS.x)/vz; n.y=dragO.y+(e.clientY-dragS.y)/vz; renderAll();}
+    if(n){n.x=dragO.x+(pos.x-dragS.x)/vz; n.y=dragO.y+(pos.y-dragS.y)/vz; renderAll();}
+    if(e.cancelable) e.preventDefault(); // prevent scrolling while dragging
   }
-});
-window.addEventListener('mouseup',()=>{
+}
+function handleUp(e) {
   if(isDrag) saveH();
   isPan=false; isDrag=false;
-});
+}
+
+wrap.addEventListener('mousedown', handleDown);
+wrap.addEventListener('touchstart', handleDown, {passive:false});
+
+window.addEventListener('mousemove', handleMove);
+window.addEventListener('touchmove', handleMove, {passive:false});
+
+window.addEventListener('mouseup', handleUp);
+window.addEventListener('touchend', handleUp);
+window.addEventListener('touchcancel', handleUp);
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
 function se(tag,attrs,txt){
@@ -267,6 +300,7 @@ function renderNode(node){
   g.appendChild(hit);
 
   g.addEventListener('mousedown',e=>onNodeDown(e,node));
+  g.addEventListener('touchstart',e=>onNodeDown(e,node), {passive:false});
   g.addEventListener('dblclick',e=>{e.stopPropagation(); promptLabel(node);});
   NG.appendChild(g);
 }
@@ -309,6 +343,7 @@ function renderEdge(edge){
   // hit area
   g.appendChild(se('line',{x1:n1.x,y1:n1.y,x2:n2.x,y2:n2.y,stroke:'transparent','stroke-width':14}));
   g.addEventListener('mousedown',e=>{e.stopPropagation(); setSel(edge.id); showEdgeProps(edge);});
+  g.addEventListener('touchstart',e=>{e.stopPropagation(); setSel(edge.id); showEdgeProps(edge);}, {passive:false});
   EG.appendChild(g);
 }
 
@@ -324,8 +359,9 @@ function setSel(id){
 
 function onNodeDown(e,node){
   e.stopPropagation();
+  if(e.cancelable && e.type === 'touchstart') e.preventDefault();
   if(tool==='connect'){
-    if(!cxStart){cxStart=node.id; document.getElementById('st-tool').textContent='Connect → click target';}
+    if(!cxStart){cxStart=node.id; document.getElementById('st-tool').textContent='Connect → tap target';}
     else if(cxStart!==node.id){
       const isId=DEFS[nodes.find(n=>n.id===cxStart)?.type]?.weak||DEFS[node.type]?.weak;
       const edge={id:mkId(),from:cxStart,to:node.id,card1:'',card2:'',dashed:false};
@@ -335,7 +371,8 @@ function onNodeDown(e,node){
     return;
   }
   setSel(node.id);
-  isDrag=true; dragS={x:e.clientX,y:e.clientY}; dragO={x:node.x,y:node.y};
+  const pos=getPos(e);
+  isDrag=true; dragS={x:pos.x,y:pos.y}; dragO={x:node.x,y:node.y};
 }
 
 // ── PROPS: NODE ────────────────────────────────────────────────────────────────
@@ -591,18 +628,24 @@ window.addEventListener('beforeunload', e=>{
 
 // ── SIDEBAR DRAG ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.shape-btn[data-type]').forEach(btn=>{
-  btn.addEventListener('mousedown',e=>{
+  function startSidebarDrag(e) {
+    if(e.cancelable && e.type === 'touchstart') e.preventDefault();
     const type=btn.dataset.type;
     function onUp(mu){
       window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchend',onUp);
+      const posE = getPos(mu);
       const r=wrap.getBoundingClientRect();
-      if(mu.clientX>r.left&&mu.clientX<r.right&&mu.clientY>r.top&&mu.clientY<r.bottom){
-        const pos=toCanvas(mu.clientX,mu.clientY);
+      if(posE.x>r.left&&posE.x<r.right&&posE.y>r.top&&posE.y<r.bottom){
+        const pos=toCanvas(posE.x,posE.y);
         addShape(type,pos.x,pos.y);
       }
     }
     window.addEventListener('mouseup',onUp);
-  });
+    window.addEventListener('touchend',onUp);
+  }
+  btn.addEventListener('mousedown', startSidebarDrag);
+  btn.addEventListener('touchstart', startSidebarDrag, {passive:false});
 });
 
 // ── FILE INPUT LISTENER ───────────────────────────────────────────────────────

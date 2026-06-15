@@ -41,10 +41,14 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--tex
 .tb-btn.active{background:var(--bg-btn-active);color:var(--text-btn-active);border-color:var(--bg-btn-active);font-weight:700}
 
 /* LAYOUT */
-#main{display:flex;flex:1;overflow:hidden;min-height:0}
+#main{display:flex;flex:1;overflow:hidden;min-height:0;position:relative}
 
 /* SIDEBAR */
-#sidebar{width:190px;background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+#sidebar{width:190px;background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;transition:margin-left 0.3s cubic-bezier(0.4,0,0.2,1); z-index: 10}
+#sidebar.closed{margin-left:-190px;}
+.sidebar-toggle{position:absolute;left:190px;top:10px;width:24px;height:40px;background:var(--bg-panel);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-weight:700;font-size:16px;user-select:none;transition:left 0.3s cubic-bezier(0.4, 0, 0.2, 1),background 0.2s,color 0.2s;z-index:11;box-shadow:2px 0 5px rgba(0,0,0,0.15);}
+.sidebar-toggle.closed{left:0;}
+.sidebar-toggle:hover{background:var(--border-hover);color:var(--text-main);}
 .sb-sec{padding:8px 8px 4px}
 .sb-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
 .shape-btn{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;background:var(--bg-main);border:1px solid var(--border);border-radius:5px;color:var(--text-main);cursor:grab;font-size:11px;margin-bottom:4px;text-align:left;transition:.12s;font-family:inherit}
@@ -59,7 +63,8 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--tex
 /* PROPS */
 #props{width:220px;background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:10px;display:flex;flex-direction:column;gap:0;transition:margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);}
 #props.closed{margin-right:-222px;}
-.props-toggle{width:16px;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-weight:700;font-size:12px;user-select:none;transition:background 0.2s,color 0.2s;flex-shrink:0;z-index:10;}
+.props-toggle{position:absolute;right:220px;top:10px;width:24px;height:40px;background:var(--bg-panel);border:1px solid var(--border);border-right:none;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-weight:700;font-size:16px;user-select:none;transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1),background 0.2s,color 0.2s;z-index:11;box-shadow:-2px 0 5px rgba(0,0,0,0.15);}
+.props-toggle.closed{right:0;}
 .props-toggle:hover{background:var(--border-hover);color:var(--text-main);}
 #props h3{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
 .pr{margin-bottom:7px}
@@ -87,3 +92,23 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--tex
 
 /* HIDDEN FILE INPUT */
 #file-input{display:none}
+
+/* RESPONSIVE LAYOUT (MOBILE / TABLET) */
+@media (max-width: 768px) {
+  #toolbar { padding: 4px 6px; gap: 4px; }
+  .tb-btn { padding: 4px 6px; font-size: 10px; }
+  .logo { font-size: 11px; }
+
+  .sidebar-toggle { width: 32px; height: 50px; }
+  .sidebar-toggle.closed { left: 0; }
+  #sidebar { position: absolute; left: 0; top: 0; bottom: 0; margin-left: 0; box-shadow: 2px 0 10px rgba(0,0,0,0.2); }
+  #sidebar.closed { margin-left: -190px; box-shadow: none; }
+
+  .props-toggle { width: 24px; height: 50px; right: 220px; }
+  .props-toggle.closed { right: 0; }
+  #props { position: absolute; right: 0; top: 0; bottom: 0; margin-right: 0; box-shadow: -2px 0 10px rgba(0,0,0,0.2); z-index: 10; }
+  #props.closed { margin-right: -220px; box-shadow: none; }
+  
+  #statusbar { padding: 3px 6px; gap: 6px; overflow-x: auto; white-space: nowrap; }
+  #statusbar span:last-child { display: none; /* Hide instruction text on mobile */ }
+}
