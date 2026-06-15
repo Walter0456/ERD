@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Chen ER Diagram Editor</title>
+<style>
+:root {
+  --bg-main: #1e1e2e;
+  --bg-panel: #24273a;
+  --bg-btn: #313244;
+  --bg-btn-hover: #45475a;
+  --bg-btn-active: #cba6f7;
+  --text-btn-active: #1e1e2e;
+  --border: #313244;
+  --border-hover: #45475a;
+  --text-main: #cdd6f4;
+  --text-muted: #6c7086;
+  --text-legend: #a6adc8;
+  --accent: #cba6f7;
+  --danger: #f38ba8;
+}
+[data-theme="light"] {
+  --bg-main: #eff1f5;
+  --bg-panel: #dce0e8;
+  --bg-btn: #ccd0da;
+  --bg-btn-hover: #bcc0cc;
+  --bg-btn-active: #8839ef;
+  --text-btn-active: #eff1f5;
+  --border: #ccd0da;
+  --border-hover: #9ca0b0;
+  --text-main: #4c4f69;
+  --text-muted: #8c8fa1;
+  --text-legend: #6c6f85;
+  --accent: #8839ef;
+  --danger: #d20f39;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--text-main);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px;transition:background 0.3s, color 0.3s}
+
+/* TOOLBAR */
+#toolbar{background:var(--bg-panel);border-bottom:1px solid var(--border);padding:6px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;z-index:100;flex-shrink:0}
+.logo{font-weight:700;font-size:13px;color:var(--accent);margin-right:6px;white-space:nowrap}
+.tb-group{display:flex;gap:3px;align-items:center;padding-right:8px;margin-right:2px;border-right:1px solid var(--border)}
+.tb-group:last-child{border-right:none}
+.tb-btn{background:var(--bg-btn);border:1px solid var(--border-hover);color:var(--text-main);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:.12s;font-family:inherit}
+.tb-btn:hover{background:var(--bg-btn-hover)}
+.tb-btn.active{background:var(--bg-btn-active);color:var(--text-btn-active);border-color:var(--bg-btn-active);font-weight:700}
+
+/* LAYOUT */
+#main{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* SIDEBAR */
+#sidebar{width:190px;background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+.sb-sec{padding:8px 8px 4px}
+.sb-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.shape-btn{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;background:var(--bg-main);border:1px solid var(--border);border-radius:5px;color:var(--text-main);cursor:grab;font-size:11px;margin-bottom:4px;text-align:left;transition:.12s;font-family:inherit}
+.shape-btn:hover{background:var(--bg-btn);border-color:var(--text-muted)}
+.shape-icon{width:34px;height:22px;flex-shrink:0}
+
+/* CANVAS */
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg-main);min-width:0}
+#grid-svg{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+#main-svg{position:absolute;top:0;left:0;cursor:default;overflow:visible;transform-origin:0 0;}
+
+/* PROPS */
+#props{width:220px;background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:10px;display:flex;flex-direction:column;gap:0;transition:margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);}
+#props.closed{margin-right:-222px;}
+.props-toggle{width:16px;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-weight:700;font-size:12px;user-select:none;transition:background 0.2s,color 0.2s;flex-shrink:0;z-index:10;}
+.props-toggle:hover{background:var(--border-hover);color:var(--text-main);}
+#props h3{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.pr{margin-bottom:7px}
+.pr label{font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px}
+.pr input,.pr select,.pr textarea{width:100%;background:var(--bg-main);border:1px solid var(--border);color:var(--text-main);border-radius:4px;padding:4px 6px;font-size:11px;font-family:inherit}
+.pr input:focus,.pr select:focus,.pr textarea:focus{outline:none;border-color:var(--accent)}
+.pr textarea{resize:vertical;min-height:90px;line-height:1.5}
+.pr-hint{font-size:9px;color:var(--border-hover);margin-top:2px}
+.pbtn{width:100%;padding:5px;border-radius:4px;border:none;cursor:pointer;font-size:11px;font-weight:700;margin-top:3px;font-family:inherit}
+.pbtn.danger{background:var(--danger);color:var(--text-btn-active)}
+.pbtn.primary{background:var(--accent);color:var(--text-btn-active)}
+.empty-msg{font-size:11px;color:var(--border-hover);text-align:center;padding-top:20px}
+.card-row{display:flex;gap:6px}
+.card-row .pr{flex:1}
+/* legend box */
+#legend{background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:7px 8px;margin-bottom:8px}
+#legend .leg-title{font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:5px}
+.leg-item{display:flex;align-items:center;gap:5px;margin-bottom:3px;font-size:10px;color:var(--text-legend)}
+.leg-line{height:2px;width:28px;background:var(--text-muted)}
+.leg-line.dashed{background:repeating-linear-gradient(90deg,var(--text-muted) 0,var(--text-muted) 4px,transparent 4px,transparent 8px)}
+
+/* STATUS */
+#statusbar{background:var(--bg-panel);border-top:1px solid var(--border);padding:3px 10px;font-size:10px;color:var(--text-muted);display:flex;gap:14px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="logo">⬡ ER Editor</span>
+  <div class="tb-group">
+    <button class="tb-btn active" id="btn-select" onclick="setTool('select')">▲ Select</button>
+    <button class="tb-btn" id="btn-connect" onclick="setTool('connect')">→ Connect</button>
+    <button class="tb-btn" id="btn-pan" onclick="setTool('pan')">✥ Pan</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb-btn" onclick="undo()">↩ Undo</button>
+    <button class="tb-btn" onclick="deleteSelected()">✕ Delete</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb-btn" onclick="zoom1(1.2)">＋</button>
+    <button class="tb-btn" onclick="zoom1(1/1.2)">－</button>
+    <button class="tb-btn" onclick="fitView()">Fit</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb-btn" onclick="toggleTheme()">🌓 Theme</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb-btn" onclick="loadSample()">🏨 Hotel Sample</button>
+    <button class="tb-btn" onclick="clearAll()">Clear</button>
+    <button class="tb-btn" onclick="doExport()">↓ Export SVG</button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-sec">
+      <div class="sb-title">Entities</div>
+      <button class="shape-btn" data-type="entity">
+        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="1" y="1" width="32" height="20" fill="#1a4480" stroke="#89b4fa" stroke-width="1.5" rx="1"/><rect x="1" y="1" width="32" height="9" fill="#1a4480" rx="1"/><text x="17" y="8" text-anchor="middle" font-size="5.5" fill="#fff" font-weight="700" font-family="Segoe UI,sans-serif">ENTITY</text><line x1="1" y1="10" x2="33" y2="10" stroke="#89b4fa" stroke-width="0.8"/><text x="5" y="16" font-size="4.5" fill="#89b4fa" font-family="Segoe UI,sans-serif">• PK_attr</text><text x="5" y="20.5" font-size="4.5" fill="#89b4fa" font-family="Segoe UI,sans-serif">• attribute</text></svg>
+        Strong Entity
+      </button>
+      <button class="shape-btn" data-type="weak_entity">
+        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="0" y="0" width="34" height="22" fill="none" stroke="#1a6b3a" stroke-width="1" rx="1"/><rect x="2" y="2" width="30" height="18" fill="#1a6b3a" stroke="#1a6b3a" stroke-width="1.5" rx="1"/><rect x="2" y="2" width="30" height="9" fill="#155228" rx="1"/><text x="17" y="8" text-anchor="middle" font-size="5" fill="#aef2c0" font-weight="700" font-family="Segoe UI,sans-serif">WEAK</text><line x1="2" y1="11" x2="32" y2="11" stroke="#1a6b3a" stroke-width="0.8"/><text x="5" y="16.5" font-size="4.5" fill="#aef2c0" font-family="Segoe UI,sans-serif">• partial_key</text></svg>
+        Weak Entity
+      </button>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-title">Relationships</div>
+      <button class="shape-btn" data-type="relationship">
+        <svg class="shape-icon" viewBox="0 0 34 22"><polygon points="17,1 33,11 17,21 1,11" fill="#fef3e2" stroke="#854f0b" stroke-width="1.5"/><text x="17" y="13.5" text-anchor="middle" font-size="5.5" fill="#5b3a00" font-weight="700" font-family="Segoe UI,sans-serif">HAS</text></svg>
+        Relationship
+      </button>
+      <button class="shape-btn" data-type="id_relationship">
+        <svg class="shape-icon" viewBox="0 0 34 22"><polygon points="17,1 33,11 17,21 1,11" fill="#eaf3de" stroke="#639922" stroke-width="1.5"/><polygon points="17,4 30,11 17,18 4,11" fill="none" stroke="#639922" stroke-width="1"/><text x="17" y="13.5" text-anchor="middle" font-size="5" fill="#3b5e0a" font-weight="700" font-family="Segoe UI,sans-serif">ID REL</text></svg>
+        Identifying Rel.
+      </button>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-title">Attributes</div>
+      <button class="shape-btn" data-type="attribute">
+        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#2d2580" font-family="Segoe UI,sans-serif">attribute</text></svg>
+        Attribute
+      </button>
+      <button class="shape-btn" data-type="pk_attribute">
+        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#ddeeff" stroke="#1a4480" stroke-width="1.5"/><ellipse cx="17" cy="11" rx="12" ry="6" fill="none" stroke="#1a4480" stroke-width="1"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#1a4480" font-weight="700" font-family="Segoe UI,sans-serif" text-decoration="underline">PK attr</text></svg>
+        PK Attribute
+      </button>
+      <button class="shape-btn" data-type="derived">
+        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5" stroke-dasharray="4 2"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#2d2580" font-family="Segoe UI,sans-serif">derived</text></svg>
+        Derived Attr.
+      </button>
+      <button class="shape-btn" data-type="multivalued">
+        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/><ellipse cx="17" cy="11" rx="12" ry="6" fill="none" stroke="#534ab7" stroke-width="1"/><text x="17" y="13" text-anchor="middle" font-size="5" fill="#2d2580" font-family="Segoe UI,sans-serif">multi</text></svg>
+        Multivalued
+      </button>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-title">Other</div>
+      <button class="shape-btn" data-type="note">
+        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="1" y="1" width="32" height="20" fill="#2a2a3e" stroke="#6c7086" stroke-width="1" stroke-dasharray="4 2" rx="2"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#6c7086" font-family="Segoe UI,sans-serif">note text</text></svg>
+        Note / Label
+      </button>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <svg id="grid-svg"><defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#2a2a3d" stroke-width="0.6"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/></svg>
+    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1,2 L8,5 L1,8" fill="none" stroke="#6c7086" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>
+      </defs>
+      <g id="edges-g"></g>
+      <g id="nodes-g"></g>
+    </svg>
+  </div>
+
+  <!-- PROPS -->
+  <div class="props-toggle" onclick="toggleProps()" id="props-toggle">&gt;</div>
+  <div id="props">
+    <h3>Properties</h3>
+    <div id="props-body"><p class="empty-msg">Click a shape to edit it.<br><br>Double-click to rename.</p></div>
+
+    <!-- LEGEND always visible at bottom -->
+    <div style="flex:1"></div>
+    <div id="legend">
+      <div class="leg-title">Cardinality Guide</div>
+      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">1:1</div> One-to-One</div>
+      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">1:N</div> One-to-Many</div>
+      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">M:N</div> Many-to-Many</div>
+      <div style="height:6px"></div>
+      <div class="leg-title">Line Types</div>
+      <div class="leg-item"><div class="leg-line"></div> Regular</div>
+      <div class="leg-item"><div class="leg-line dashed"></div> Identifying</div>
+      <div style="height:6px"></div>
+      <div class="leg-title">Shapes</div>
+      <div class="leg-item"><svg width="28" height="14"><rect x="1" y="1" width="26" height="12" fill="none" stroke="#89b4fa" stroke-width="1.5"/></svg> Entity</div>
+      <div class="leg-item"><svg width="28" height="14"><rect x="0" y="0" width="28" height="14" fill="none" stroke="#1a6b3a" stroke-width="1"/><rect x="2" y="2" width="24" height="10" fill="none" stroke="#1a6b3a" stroke-width="1"/></svg> Weak Entity</div>
+      <div class="leg-item"><svg width="28" height="14"><polygon points="14,1 27,7 14,13 1,7" fill="none" stroke="#854f0b" stroke-width="1.5"/></svg> Relationship</div>
+      <div class="leg-item"><svg width="28" height="14"><polygon points="14,1 27,7 14,13 1,7" fill="none" stroke="#639922" stroke-width="1.5"/><polygon points="14,3 25,7 14,11 3,7" fill="none" stroke="#639922" stroke-width="1"/></svg> Identifying Rel.</div>
+      <div class="leg-item"><svg width="28" height="14"><ellipse cx="14" cy="7" rx="13" ry="6" fill="none" stroke="#534ab7" stroke-width="1.2"/></svg> Attribute</div>
+      <div class="leg-item"><svg width="28" height="14"><ellipse cx="14" cy="7" rx="13" ry="6" fill="none" stroke="#1a4480" stroke-width="1.5"/><ellipse cx="14" cy="7" rx="9" ry="4" fill="none" stroke="#1a4480" stroke-width="1"/></svg> PK Attribute</div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="st-tool">Tool: Select</span>
+  <span id="st-nodes">Nodes: 0</span>
+  <span id="st-edges">Edges: 0</span>
+  <span id="st-zoom">Zoom: 100%</span>
+  <span style="margin-left:auto">Drag shapes from sidebar • C=Connect • Del=Delete • Space=Pan • Dbl-click=Rename</span>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let nodes=[], edges=[], sel=null, tool='select';
+let vx=100, vy=80, vz=1;
+let isPan=false, panS={x:0,y:0}, panO={x:0,y:0};
+let isDrag=false, dragS={x:0,y:0}, dragO={x:0,y:0};
+let cxStart=null;
+let hist=[], histIdx=-1;
+let uid=1;
+
+const SVG=document.getElementById('main-svg');
+const NG=document.getElementById('nodes-g');
+const EG=document.getElementById('edges-g');
+const wrap=document.getElementById('canvas-wrap');
+
+const THEMES = {
+  dark: {
+    gridLine: '#2a2a3d',
+    defs: {
+      entity:    {label:'ENTITY',   w:160,h:100,hdr:'#1a4480',fill:'#181825',stroke:'#89b4fa',tc:'#fff', tuple:'#cdd6f4', tuplePk:'#89b4fa',type:'rect'},
+      weak_entity:{label:'WEAK',    w:160,h:100,hdr:'#155228',fill:'#181825',stroke:'#1a6b3a',tc:'#aef2c0', tuple:'#cdd6f4', tuplePk:'#aef2c0',type:'rect',weak:true},
+      relationship:{label:'HAS',    w:110,h:56, fill:'#181825',stroke:'#f9e2af',tc:'#f9e2af',type:'diamond'},
+      id_relationship:{label:'HAS', w:110,h:56, fill:'#181825',stroke:'#a6e3a1',tc:'#a6e3a1',type:'diamond',dbl:true},
+      attribute:  {label:'attribute',rx:62,ry:20,fill:'#181825',stroke:'#cba6f7',tc:'#cba6f7',type:'ellipse'},
+      pk_attribute:{label:'pk_attr',rx:62,ry:20,fill:'#181825',stroke:'#89b4fa',tc:'#89b4fa',type:'ellipse',dbl:true,ul:true},
+      derived:    {label:'derived', rx:62,ry:20,fill:'#181825',stroke:'#cba6f7',tc:'#cba6f7',type:'ellipse',dash:true},
+      multivalued:{label:'multi',   rx:62,ry:20,fill:'#181825',stroke:'#cba6f7',tc:'#cba6f7',type:'ellipse',dbl:true},
+      note:       {label:'Note',    w:160,h:60, fill:'#181825',stroke:'#6c7086',tc:'#a6adc8',type:'note',dash:true}
+    },
+    edgeStroke: '#6c7086',
+    edgeSel: '#cba6f7',
+    edgeCardBg: '#1e1e2e',
+    edgeCardText: '#f9e2af',
+    selStroke: '#cba6f7'
+  },
+  light: {
+    gridLine: '#dce0e8',
+    defs: {
+      entity:    {label:'ENTITY',   w:160,h:100,hdr:'#1e66f5',fill:'#ffffff',stroke:'#7287fd',tc:'#fff', tuple:'#4c4f69', tuplePk:'#1e66f5',type:'rect'},
+      weak_entity:{label:'WEAK',    w:160,h:100,hdr:'#40a02b',fill:'#ffffff',stroke:'#52c837',tc:'#ffffff', tuple:'#4c4f69', tuplePk:'#40a02b',type:'rect',weak:true},
+      relationship:{label:'HAS',    w:110,h:56, fill:'#ffffff',stroke:'#df8e1d',tc:'#df8e1d',type:'diamond'},
+      id_relationship:{label:'HAS', w:110,h:56, fill:'#ffffff',stroke:'#40a02b',tc:'#40a02b',type:'diamond',dbl:true},
+      attribute:  {label:'attribute',rx:62,ry:20,fill:'#ffffff',stroke:'#8839ef',tc:'#8839ef',type:'ellipse'},
+      pk_attribute:{label:'pk_attr',rx:62,ry:20,fill:'#ffffff',stroke:'#1e66f5',tc:'#1e66f5',type:'ellipse',dbl:true,ul:true},
+      derived:    {label:'derived', rx:62,ry:20,fill:'#ffffff',stroke:'#8839ef',tc:'#8839ef',type:'ellipse',dash:true},
+      multivalued:{label:'multi',   rx:62,ry:20,fill:'#ffffff',stroke:'#8839ef',tc:'#8839ef',type:'ellipse',dbl:true},
+      note:       {label:'Note',    w:160,h:60, fill:'#e6e9ef',stroke:'#8c8fa1',tc:'#5c5f77',type:'note',dash:true}
+    },
+    edgeStroke: '#9ca0b0',
+    edgeSel: '#8839ef',
+    edgeCardBg: '#eff1f5',
+    edgeCardText: '#df8e1d',
+    selStroke: '#8839ef'
+  }
+};
+
+let currentTheme = 'dark';
+let DEFS = THEMES.dark.defs;
+
+function toggleTheme() {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  DEFS = THEMES[currentTheme].defs;
+  document.querySelector('#grid-svg').innerHTML = `<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="${THEMES[currentTheme].gridLine}" stroke-width="0.6"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/>`;
+  renderAll();
+}
+
+function toggleProps() {
+  const p = document.getElementById('props');
+  const t = document.getElementById('props-toggle');
+  p.classList.toggle('closed');
+  if(t) t.innerHTML = p.classList.contains('closed') ? '&lt;' : '&gt;';
+}
+
+// ── TRANSFORM ──────────────────────────────────────────────────────────────────
+function applyT(){
+  SVG.style.transform=`translate(${vx}px,${vy}px) scale(${vz})`;
+  document.getElementById('st-zoom').textContent='Zoom: '+Math.round(vz*100)+'%';
+}
+function zoom1(f){
+  const rect=wrap.getBoundingClientRect();
+  const cx=rect.width/2, cy=rect.height/2;
+  const newVz=Math.min(Math.max(vz*f,0.15),5);
+  const actualF=newVz/vz;
+  vx=cx-(cx-vx)*actualF; vy=cy-(cy-vy)*actualF; vz=newVz;
+  applyT();
+}
+function fitView(){vx=100;vy=80;vz=1;applyT();}
+
+wrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const f=e.deltaY>0?0.9:1.1;
+  const rect=wrap.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const newVz=Math.min(Math.max(vz*f,0.15),5);
+  const actualF=newVz/vz;
+  vx=mx-(mx-vx)*actualF; vy=my-(my-vy)*actualF; vz=newVz;
+  applyT();
+},{passive:false});
+
+function toCanvas(cx,cy){
+  const r=wrap.getBoundingClientRect();
+  return {x:(cx-r.left-vx)/vz, y:(cy-r.top-vy)/vz};
+}
+
+// ── TOOL ───────────────────────────────────────────────────────────────────────
+function setTool(t){
+  tool=t; cxStart=null;
+  ['select','connect','pan'].forEach(k=>{
+    const b=document.getElementById('btn-'+k);
+    if(b) b.classList.toggle('active',k===t);
+  });
+  wrap.style.cursor=t==='pan'?'grab':'default';
+  document.getElementById('st-tool').textContent='Tool: '+t[0].toUpperCase()+t.slice(1);
+  if(t!=='connect') cxStart=null;
+}
+
+// ── PAN / DRAG ─────────────────────────────────────────────────────────────────
+wrap.addEventListener('mousedown',e=>{
+  if(tool==='pan' || (e.ctrlKey && e.button === 0)){
+    isPan=true; panS={x:e.clientX,y:e.clientY}; panO={x:vx,y:vy};
+    e.preventDefault();
+  } else if(e.target===wrap||e.target===SVG||e.target.tagName==='svg'){
+    setSel(null);
+  }
+});
+window.addEventListener('mousemove',e=>{
+  if(isPan){vx=panO.x+(e.clientX-panS.x); vy=panO.y+(e.clientY-panS.y); applyT();}
+  if(isDrag&&sel){
+    const n=nodes.find(n=>n.id===sel);
+    if(n){n.x=dragO.x+(e.clientX-dragS.x)/vz; n.y=dragO.y+(e.clientY-dragS.y)/vz; renderAll();}
+  }
+});
+window.addEventListener('mouseup',()=>{
+  if(isDrag) saveH();
+  isPan=false; isDrag=false;
+});
+
+// ── HELPERS ────────────────────────────────────────────────────────────────────
+function se(tag,attrs,txt){
+  const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) e.setAttribute(k,String(v));
+  if(txt!==undefined) e.textContent=txt;
+  return e;
+}
+function mkId(){return 'n'+(uid++);}
+
+// ── ADD SHAPE ──────────────────────────────────────────────────────────────────
+function addShape(type,x,y){
+  const d=DEFS[type]; if(!d) return;
+  const node={
+    id:mkId(), type,
+    x:x??500, y:y??300,
+    label:d.label,
+    tuples:[], // [{label,isPK,isPartial,isFk}]
+    w:d.w??140, h:d.h??60,
+    rx:d.rx??60, ry:d.ry??20
+  };
+  // default tuples for entities
+  if(type==='entity') node.tuples=[{label:'id',isPK:true,isPartial:false,isFk:false},{label:'attribute1',isPK:false,isPartial:false,isFk:false}];
+  if(type==='weak_entity') node.tuples=[{label:'partial_key',isPK:false,isPartial:true,isFk:false},{label:'attribute1',isPK:false,isPartial:false,isFk:false}];
+  nodes.push(node);
+  saveH(); renderAll(); setSel(node.id);
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────────
+function renderAll(){
+  NG.innerHTML=''; EG.innerHTML='';
+  edges.forEach(renderEdge);
+  nodes.forEach(renderNode);
+  document.getElementById('st-nodes').textContent='Nodes: '+nodes.length;
+  document.getElementById('st-edges').textContent='Edges: '+edges.length;
+}
+
+function nodeSize(node){
+  const d=DEFS[node.type]||DEFS.entity;
+  if(d.type==='rect'||d.type==='note'){
+    const tuples=node.tuples||[];
+    const hdrH = d.weak ? 34 : 26;
+    const minH=Math.max(node.h||60, tuples.length>0 ? hdrH+12+tuples.length*17 : hdrH+24);
+    return {w:node.w||160, h:minH};
+  }
+  return {w:node.rx*2||120,h:node.ry*2||40};
+}
+
+function renderNode(node){
+  const th = THEMES[currentTheme];
+  const d=DEFS[node.type]||DEFS.entity;
+  const g=se('g',{'class':'node-g'+(sel===node.id?' sel':''),'data-id':node.id});
+  const {w,h}=nodeSize(node);
+
+  if(d.type==='rect'||d.type==='note'){
+    const x=node.x-w/2, y=node.y-h/2;
+    // outer double border for weak
+    if(d.weak){
+      g.appendChild(se('rect',{x:x-4,y:y-4,width:w+8,height:h+8,rx:3,fill:'none',stroke:d.stroke,'stroke-width':1.5,'class':'nb'}));
+    }
+    // main box
+    const box=se('rect',{x,y,width:w,height:h,rx:2,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,'stroke-width':sel===node.id?2.5:2,'class':'nb','stroke-dasharray':d.dash?'6 3':'none'});
+    g.appendChild(box);
+
+    if(d.type==='rect'){
+      const hdrH = d.weak ? 34 : 26;
+      // header
+      const hbar=se('rect',{x,y,width:w,height:hdrH,rx:2,fill:d.hdr});
+      g.appendChild(hbar);
+      // title
+      const tit=se('text',{x:node.x,y:d.weak ? y+11 : y+14,'text-anchor':'middle','dominant-baseline':'central','font-size':11,'font-weight':700,fill:d.tc,'font-family':'Segoe UI,sans-serif'});
+      tit.textContent=node.label;
+      g.appendChild(tit);
+      // weak sub-label
+      if(d.weak){
+        const sub=se('text',{x:node.x,y:y+24,'text-anchor':'middle','dominant-baseline':'central','font-size':8,fill:d.tc,'font-family':'Segoe UI,sans-serif'});
+        sub.textContent='(Weak Entity)';
+        g.appendChild(sub);
+      }
+      // divider
+      g.appendChild(se('line',{x1:x,y1:y+hdrH,x2:x+w,y2:y+hdrH,stroke:d.stroke,'stroke-width':1}));
+      // tuples
+      const tuples=node.tuples||[];
+      tuples.forEach((t,i)=>{
+        const ty=y+hdrH+12+i*17;
+        g.appendChild(se('text',{x:x+10,y:ty,'font-size':10,fill:th.edgeStroke,'font-family':'Segoe UI,sans-serif'},'•'));
+        const lbl=(t.isPK?'🔑 ':'')+(t.isFk?'🔗 ':'')+t.label+(t.isPK?' (PK)':t.isPartial?' (Partial Key)':t.isFk?' (FK)':'');
+        const tt=se('text',{x:x+20,y:ty,'font-size':10,fill:t.isPK||t.isPartial?d.tuplePk:d.tuple,
+          'font-weight':t.isPK||t.isPartial?700:400,
+          'text-decoration':t.isPK||t.isPartial?'underline':'none',
+          'font-family':'Segoe UI,sans-serif'});
+        tt.textContent=lbl;
+        g.appendChild(tt);
+      });
+    } else {
+      // note
+      const tit=se('text',{x:node.x,y:node.y,'text-anchor':'middle','dominant-baseline':'central','font-size':10,fill:d.tc,'font-family':'Segoe UI,sans-serif'});
+      tit.textContent=node.label;
+      g.appendChild(tit);
+    }
+  } else if(d.type==='diamond'){
+    const hw=node.w/2, hh=node.h/2;
+    const pts=`${node.x},${node.y-hh} ${node.x+hw},${node.y} ${node.x},${node.y+hh} ${node.x-hw},${node.y}`;
+    if(d.dbl){
+      const op=`${node.x},${node.y-hh-5} ${node.x+hw+7},${node.y} ${node.x},${node.y+hh+5} ${node.x-hw-7},${node.y}`;
+      g.appendChild(se('polygon',{points:op,fill:'none',stroke:d.stroke,'stroke-width':1.5}));
+    }
+    g.appendChild(se('polygon',{points:pts,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,'stroke-width':sel===node.id?2.5:2,'class':'nb'}));
+    const tit=se('text',{x:node.x,y:node.y,'text-anchor':'middle','dominant-baseline':'central','font-size':11,'font-weight':700,fill:d.tc,'font-family':'Segoe UI,sans-serif'});
+    tit.textContent=node.label;
+    g.appendChild(tit);
+  } else {
+    // ellipse
+    const rx=node.rx??60, ry=node.ry??20;
+    if(d.dbl) g.appendChild(se('ellipse',{cx:node.x,cy:node.y,rx:rx+4,ry:ry+4,fill:'none',stroke:d.stroke,'stroke-width':1.2}));
+    g.appendChild(se('ellipse',{cx:node.x,cy:node.y,rx,ry,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,
+      'stroke-width':sel===node.id?2.5:1.5,'class':'nb','stroke-dasharray':d.dash?'5 3':'none'}));
+    const tit=se('text',{x:node.x,y:node.y,'text-anchor':'middle','dominant-baseline':'central','font-size':10,
+      fill:d.tc,'font-weight':d.ul?700:400,'text-decoration':d.ul?'underline':'none','font-family':'Segoe UI,sans-serif'});
+    tit.textContent=node.label;
+    g.appendChild(tit);
+  }
+
+  // invisible hit area
+  const {w:sw,h:sh}=nodeSize(node);
+  const hit=se('rect',{x:node.x-sw/2,y:node.y-sh/2,width:sw,height:sh,fill:'transparent',stroke:'none'});
+  g.appendChild(hit);
+
+  g.addEventListener('mousedown',e=>onNodeDown(e,node));
+  g.addEventListener('dblclick',e=>{e.stopPropagation(); promptLabel(node);});
+  NG.appendChild(g);
+}
+
+function renderEdge(edge){
+  const th = THEMES[currentTheme];
+  const n1=nodes.find(n=>n.id===edge.from), n2=nodes.find(n=>n.id===edge.to);
+  if(!n1||!n2) return;
+  const g=se('g',{'class':'edge-g','data-id':edge.id});
+  const isSel=sel===edge.id;
+  const isId=edge.dashed;
+
+  // line
+  const ln=se('line',{x1:n1.x,y1:n1.y,x2:n2.x,y2:n2.y,
+    stroke:isSel?th.selStroke:th.edgeStroke,'stroke-width':isSel?2:1.5,
+    'stroke-dasharray':isId?'8 4':'none'});
+  g.appendChild(ln);
+
+  // cardinality labels — centered
+  let cText='';
+  if(edge.card1&&edge.card2) cText=edge.card1+':'+edge.card2;
+  else if(edge.card1) cText=edge.card1;
+  else if(edge.card2) cText=edge.card2;
+
+  if(cText){
+    let t = 0.5;
+    const t1 = (DEFS[n1.type]||{}).type, t2 = (DEFS[n2.type]||{}).type;
+    if(t1 === 'diamond' && t2 !== 'diamond') t = 0.28;
+    else if(t2 === 'diamond' && t1 !== 'diamond') t = 0.72;
+    const cx=n1.x+(n2.x-n1.x)*t, cy=n1.y+(n2.y-n1.y)*t;
+    const cw=cText.length>1?32:20;
+    const bg=se('rect',{x:cx-cw/2,y:cy-10,width:cw,height:20,rx:10,fill:th.edgeCardBg,stroke:isSel?th.selStroke:th.edgeStroke,'stroke-width':1});
+    g.appendChild(bg);
+    const ct=se('text',{x:cx,y:cy,'text-anchor':'middle','dominant-baseline':'central',
+      'font-size':11,'font-weight':700,fill:isSel?th.selStroke:th.edgeCardText,'font-family':'Segoe UI,sans-serif'});
+    ct.textContent=cText;
+    g.appendChild(ct);
+  }
+
+  // hit area
+  g.appendChild(se('line',{x1:n1.x,y1:n1.y,x2:n2.x,y2:n2.y,stroke:'transparent','stroke-width':14}));
+  g.addEventListener('mousedown',e=>{e.stopPropagation(); setSel(edge.id); showEdgeProps(edge);});
+  EG.appendChild(g);
+}
+
+// ── SELECTION ──────────────────────────────────────────────────────────────────
+function setSel(id){
+  sel=id; renderAll();
+  if(!id){document.getElementById('props-body').innerHTML='<p class="empty-msg">Click a shape to edit it.<br><br>Double-click to rename.</p>'; return;}
+  const node=nodes.find(n=>n.id===id);
+  const edge=edges.find(e=>e.id===id);
+  if(node) showNodeProps(node);
+  if(edge) showEdgeProps(edge);
+}
+
+function onNodeDown(e,node){
+  e.stopPropagation();
+  if(tool==='connect'){
+    if(!cxStart){cxStart=node.id; document.getElementById('st-tool').textContent='Connect → click target';}
+    else if(cxStart!==node.id){
+      const isId=DEFS[nodes.find(n=>n.id===cxStart)?.type]?.weak||DEFS[node.type]?.weak;
+      const edge={id:mkId(),from:cxStart,to:node.id,card1:'',card2:'',dashed:false};
+      edges.push(edge); cxStart=null; saveH(); renderAll(); setSel(edge.id);
+      document.getElementById('st-tool').textContent='Tool: Connect';
+    }
+    return;
+  }
+  setSel(node.id);
+  isDrag=true; dragS={x:e.clientX,y:e.clientY}; dragO={x:node.x,y:node.y};
+}
+
+// ── PROPS: NODE ────────────────────────────────────────────────────────────────
+function showNodeProps(node){
+  const d=DEFS[node.type]||{};
+  const isEllipse=['attribute','pk_attribute','derived','multivalued'].includes(node.type);
+  const isEntity=['entity','weak_entity'].includes(node.type);
+  const tuples=node.tuples||[];
+
+  let tuplesHTML='';
+  if(isEntity){
+    tuplesHTML=`
+    <div class="pr">
+      <label>Attributes (one per line)</label>
+      <div style="font-size:9px;color:#6c7086;margin-bottom:3px">
+        Prefix with <b>PK:</b> for Primary Key, <b>FK:</b> for Foreign Key, <b>P:</b> for Partial Key<br>
+        e.g. <code style="color:#cba6f7">PK: id</code> or <code style="color:#cba6f7">FK: room_id</code>
+      </div>
+      <textarea id="tuple-ta" rows="8" style="font-family:monospace">${tuples.map(t=>(t.isPK?'PK: ':t.isPartial?'P: ':t.isFk?'FK: ':'')+t.label).join('\n')}</textarea>
+      <button class="pbtn primary" style="margin-top:4px" onclick="applyTuples('${node.id}')">Apply Attributes</button>
+    </div>`;
+  }
+
+  document.getElementById('props-body').innerHTML=`
+    <div class="pr">
+      <label>Type</label>
+      <select onchange="changeType('${node.id}',this.value)">
+        ${Object.keys(DEFS).map(t=>`<option value="${t}"${t===node.type?' selected':''}>${t.replace(/_/g,' ')}</option>`).join('')}
+      </select>
+    </div>
+    <div class="pr">
+      <label>Label / Name</label>
+      <input type="text" value="${node.label}" oninput="setProp('${node.id}','label',this.value)"/>
+    </div>
+    ${isEllipse?`
+    <div class="pr"><label>Radius X</label><input type="number" value="${node.rx}" oninput="setProp('${node.id}','rx',+this.value)"/></div>
+    <div class="pr"><label>Radius Y</label><input type="number" value="${node.ry}" oninput="setProp('${node.id}','ry',+this.value)"/></div>
+    `:`
+    <div class="pr"><label>Width</label><input type="number" value="${node.w}" oninput="setProp('${node.id}','w',+this.value)"/></div>
+    `}
+    ${tuplesHTML}
+    <button class="pbtn danger" onclick="deleteSelected()">Delete Shape</button>
+  `;
+}
+
+function applyTuples(id){
+  const node=nodes.find(n=>n.id===id); if(!node) return;
+  const raw=document.getElementById('tuple-ta').value;
+  node.tuples=raw.split('\n').filter(l=>l.trim()).map(l=>{
+    const isPK=l.startsWith('PK:');
+    const isP=l.startsWith('P:');
+    const isFk=l.startsWith('FK:');
+    const label=l.replace(/^(PK:|P:|FK:)\s*/,'').trim();
+    return {label,isPK,isPartial:isP,isFk};
+  });
+  saveH(); renderAll(); showNodeProps(node);
+}
+
+function setProp(id,key,val){
+  const n=nodes.find(n=>n.id===id); if(!n) return;
+  n[key]=val; renderAll();
+}
+
+function changeType(id,type){
+  const n=nodes.find(n=>n.id===id); if(!n) return;
+  const d=DEFS[type]; n.type=type;
+  if(d.w) n.w=d.w; if(d.h) n.h=d.h;
+  if(d.rx) n.rx=d.rx; if(d.ry) n.ry=d.ry;
+  if(type==='entity'&&!n.tuples?.length) n.tuples=[{label:'id',isPK:true,isPartial:false,isFk:false}];
+  if(type==='weak_entity'&&!n.tuples?.length) n.tuples=[{label:'partial_key',isPK:false,isPartial:true,isFk:false}];
+  saveH(); renderAll(); showNodeProps(n);
+}
+
+function promptLabel(node){
+  const v=prompt('Rename:',node.label);
+  if(v!==null){node.label=v; saveH(); renderAll(); showNodeProps(node);}
+}
+
+// ── PROPS: EDGE ────────────────────────────────────────────────────────────────
+function showEdgeProps(edge){
+  const n1=nodes.find(n=>n.id===edge.from), n2=nodes.find(n=>n.id===edge.to);
+  document.getElementById('props-body').innerHTML=`
+    <div class="pr"><label>From</label><input readonly value="${n1?.label||edge.from}"/></div>
+    <div class="pr"><label>To</label><input readonly value="${n2?.label||edge.to}"/></div>
+    <div class="pr">
+      <label>Cardinality</label>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;margin-bottom:4px">
+        <select id="ec1" onchange="setEdgeProp('${edge.id}','card1',this.value)">
+          ${['','1','N','M'].map(v=>`<option${edge.card1===v?' selected':''}>${v}</option>`).join('')}
+        </select>
+        <span style="font-size:11px;color:#6c7086">:</span>
+        <select id="ec2" onchange="setEdgeProp('${edge.id}','card2',this.value)">
+          ${['','1','N','M'].map(v=>`<option${edge.card2===v?' selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div style="font-size:9px;color:#6c7086">Left = near "${n1?.label||'from'}" side</div>
+    </div>
+    <div class="pr">
+      <label>Line Style</label>
+      <select onchange="setEdgeProp('${edge.id}','dashed',this.value==='true')">
+        <option value="false"${!edge.dashed?' selected':''}>Solid (regular)</option>
+        <option value="true"${edge.dashed?' selected':''}>Dashed (identifying)</option>
+      </select>
+    </div>
+    <div style="background:#1e1e2e;border:1px solid #313244;border-radius:5px;padding:8px;margin-bottom:8px;font-size:10px;color:#a6adc8">
+      <b style="color:#cdd6f4">Cardinality guide:</b><br>
+      <b>1:1</b> — One booking has one guest<br>
+      <b>1:N</b> — One room type has many units<br>
+      <b>M:N</b> — Students enroll in many subjects
+    </div>
+    <button class="pbtn danger" onclick="deleteSelected()">Delete Edge</button>
+  `;
+}
+
+function setEdgeProp(id,key,val){
+  const e=edges.find(e=>e.id===id); if(!e) return;
+  e[key]=val; saveH(); renderAll(); showEdgeProps(e);
+}
+
+// ── DELETE ─────────────────────────────────────────────────────────────────────
+function deleteSelected(){
+  if(!sel) return;
+  nodes=nodes.filter(n=>n.id!==sel);
+  edges=edges.filter(e=>e.id!==sel&&e.from!==sel&&e.to!==sel);
+  sel=null; saveH(); renderAll();
+  document.getElementById('props-body').innerHTML='<p class="empty-msg">Click a shape to edit it.</p>';
+}
+
+// ── HISTORY ────────────────────────────────────────────────────────────────────
+function saveH(){
+  const s=JSON.stringify({nodes,edges});
+  hist=hist.slice(0,histIdx+1); hist.push(s); histIdx=hist.length-1;
+}
+function undo(){
+  if(histIdx>0){histIdx--; const s=JSON.parse(hist[histIdx]); nodes=s.nodes; edges=s.edges; sel=null; renderAll();}
+}
+
+// ── CLEAR ──────────────────────────────────────────────────────────────────────
+function clearAll(){
+  if(!nodes.length||confirm('Clear the canvas?')){nodes=[];edges=[];sel=null;saveH();renderAll();}
+}
+
+// ── EXPORT ─────────────────────────────────────────────────────────────────────
+function doExport(){
+  const s=SVG.cloneNode(true);
+  s.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  const blob=new Blob([s.outerHTML],{type:'image/svg+xml'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='er_diagram.svg'; a.click();
+}
+
+// ── KEYBOARD ───────────────────────────────────────────────────────────────────
+window.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='Delete'||e.key==='Backspace') deleteSelected();
+  if(e.key==='v'||e.key==='V') setTool('select');
+  if(e.key==='c'||e.key==='C') setTool('connect');
+  if(e.key===' '){e.preventDefault(); setTool('pan');}
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault(); undo();}
+});
+window.addEventListener('keyup',e=>{if(e.key===' ') setTool('select');});
+
+// ── SIDEBAR DRAG ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.shape-btn[data-type]').forEach(btn=>{
+  btn.addEventListener('mousedown',e=>{
+    const type=btn.dataset.type;
+    function onUp(mu){
+      window.removeEventListener('mouseup',onUp);
+      const r=wrap.getBoundingClientRect();
+      if(mu.clientX>r.left&&mu.clientX<r.right&&mu.clientY>r.top&&mu.clientY<r.bottom){
+        const pos=toCanvas(mu.clientX,mu.clientY);
+        addShape(type,pos.x,pos.y);
+      }
+    }
+    window.addEventListener('mouseup',onUp);
+  });
+});
+
+// ── HOTEL SAMPLE ──────────────────────────────────────────────────────────────
+function loadSample(){
+  clearAll(); uid=200;
+  nodes=[
+    {id:'s1',type:'entity',label:'BOOKINGS',x:520,y:330,w:175,h:50,tuples:[
+      {label:'id',isPK:true,isPartial:false,isFk:false},
+      {label:'reservation_number',isPK:false,isPartial:false,isFk:false},
+      {label:'room_type_id',isPK:false,isPartial:false,isFk:true},
+      {label:'room_unit_id',isPK:false,isPartial:false,isFk:true},
+      {label:'check_in_date',isPK:false,isPartial:false,isFk:false},
+      {label:'check_out_date',isPK:false,isPartial:false,isFk:false},
+      {label:'adults',isPK:false,isPartial:false,isFk:false},
+      {label:'total_price',isPK:false,isPartial:false,isFk:false},
+      {label:'booking_status',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s2',type:'entity',label:'ROOM_TYPES',x:180,y:200,w:165,h:50,tuples:[
+      {label:'room_type_id',isPK:true,isPartial:false,isFk:false},
+      {label:'room_name',isPK:false,isPartial:false,isFk:false},
+      {label:'base_price',isPK:false,isPartial:false,isFk:false},
+      {label:'max_guests',isPK:false,isPartial:false,isFk:false},
+      {label:'extra_person_charge',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s3',type:'weak_entity',label:'ROOM_UNITS',x:180,y:480,w:165,h:50,tuples:[
+      {label:'unit_id',isPK:false,isPartial:true,isFk:false},
+      {label:'room_type_id',isPK:false,isPartial:false,isFk:true},
+      {label:'unit_number',isPK:false,isPartial:false,isFk:false},
+      {label:'status',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s4',type:'entity',label:'ADMIN_USERS',x:870,y:200,w:165,h:50,tuples:[
+      {label:'id',isPK:true,isPartial:false,isFk:false},
+      {label:'username',isPK:false,isPartial:false,isFk:false},
+      {label:'full_name',isPK:false,isPartial:false,isFk:false},
+      {label:'email',isPK:false,isPartial:false,isFk:false},
+      {label:'role',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s5',type:'weak_entity',label:'PAYMENTS',x:520,y:600,w:165,h:50,tuples:[
+      {label:'id',isPK:true,isPartial:false,isFk:false},
+      {label:'booking_id',isPK:false,isPartial:false,isFk:true},
+      {label:'amount_paid',isPK:false,isPartial:false,isFk:false},
+      {label:'payment_method',isPK:false,isPartial:false,isFk:false},
+      {label:'payment_status',isPK:false,isPartial:false,isFk:false},
+      {label:'payment_date',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s6',type:'weak_entity',label:'GUESTS',x:870,y:480,w:165,h:50,tuples:[
+      {label:'id',isPK:true,isPartial:false,isFk:false},
+      {label:'booking_id',isPK:false,isPartial:false,isFk:true},
+      {label:'full_name',isPK:false,isPartial:false,isFk:false},
+      {label:'contact_number',isPK:false,isPartial:false,isFk:false},
+      {label:'id_type',isPK:false,isPartial:false,isFk:false},
+      {label:'id_number',isPK:false,isPartial:false,isFk:false},
+    ]},
+    {id:'s7',type:'entity',label:'ACTIVITY_LOGS',x:870,y:680,w:165,h:50,tuples:[
+      {label:'id',isPK:true,isPartial:false,isFk:false},
+      {label:'user_id',isPK:false,isPartial:false,isFk:true},
+      {label:'action_type',isPK:false,isPartial:false,isFk:false},
+      {label:'description',isPK:false,isPartial:false,isFk:false},
+      {label:'created_at',isPK:false,isPartial:false,isFk:false},
+    ]},
+    // relationships
+    {id:'r1',type:'relationship',label:'HAS',x:350,y:255,w:110,h:55},
+    {id:'r2',type:'id_relationship',label:'ASSIGNED',x:350,y:420,w:120,h:55},
+    {id:'r3',type:'id_relationship',label:'HAS',x:690,y:480,w:110,h:55},
+    {id:'r4',type:'id_relationship',label:'HAS',x:690,y:330,w:110,h:55},
+    {id:'r5',type:'relationship',label:'DELETES',x:690,y:200,w:120,h:55},
+    {id:'r6',type:'relationship',label:'GENERATES',x:870,y:580,w:130,h:55},
+  ];
+  edges=[
+    {id:'e1',from:'s2',to:'r1',card1:'1',card2:'',dashed:false},
+    {id:'e2',from:'r1',to:'s1',card1:'',card2:'N',dashed:false},
+    {id:'e3',from:'s3',to:'r2',card1:'1',card2:'',dashed:true},
+    {id:'e4',from:'r2',to:'s1',card1:'',card2:'N',dashed:false},
+    {id:'e5',from:'s1',to:'r4',card1:'1',card2:'',dashed:false},
+    {id:'e6',from:'r4',to:'s6',card1:'',card2:'1',dashed:true},
+    {id:'e7',from:'s1',to:'r3',card1:'1',card2:'',dashed:false},
+    {id:'e8',from:'r3',to:'s5',card1:'',card2:'N',dashed:true},
+    {id:'e9',from:'s4',to:'r5',card1:'1',card2:'',dashed:false},
+    {id:'e10',from:'r5',to:'s1',card1:'',card2:'N',dashed:false},
+    {id:'e11',from:'s4',to:'r6',card1:'1',card2:'',dashed:false},
+    {id:'e12',from:'r6',to:'s7',card1:'',card2:'N',dashed:false},
+  ];
+  saveH(); renderAll(); fitView();
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+SVG.setAttribute('width',4000); SVG.setAttribute('height',3000);
+saveH(); applyT(); loadSample();
+</script>
+</body>
+</html>
