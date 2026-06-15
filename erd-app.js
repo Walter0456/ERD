@@ -1,228 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Chen ER Diagram Editor</title>
-<style>
-:root {
-  --bg-main: #1e1e2e;
-  --bg-panel: #24273a;
-  --bg-btn: #313244;
-  --bg-btn-hover: #45475a;
-  --bg-btn-active: #cba6f7;
-  --text-btn-active: #1e1e2e;
-  --border: #313244;
-  --border-hover: #45475a;
-  --text-main: #cdd6f4;
-  --text-muted: #6c7086;
-  --text-legend: #a6adc8;
-  --accent: #cba6f7;
-  --danger: #f38ba8;
-}
-[data-theme="light"] {
-  --bg-main: #eff1f5;
-  --bg-panel: #dce0e8;
-  --bg-btn: #ccd0da;
-  --bg-btn-hover: #bcc0cc;
-  --bg-btn-active: #8839ef;
-  --text-btn-active: #eff1f5;
-  --border: #ccd0da;
-  --border-hover: #9ca0b0;
-  --text-main: #4c4f69;
-  --text-muted: #8c8fa1;
-  --text-legend: #6c6f85;
-  --accent: #8839ef;
-  --danger: #d20f39;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:var(--bg-main);color:var(--text-main);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px;transition:background 0.3s, color 0.3s}
-
-/* TOOLBAR */
-#toolbar{background:var(--bg-panel);border-bottom:1px solid var(--border);padding:6px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;z-index:100;flex-shrink:0}
-.logo{font-weight:700;font-size:13px;color:var(--accent);margin-right:6px;white-space:nowrap}
-.tb-group{display:flex;gap:3px;align-items:center;padding-right:8px;margin-right:2px;border-right:1px solid var(--border)}
-.tb-group:last-child{border-right:none}
-.tb-btn{background:var(--bg-btn);border:1px solid var(--border-hover);color:var(--text-main);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:.12s;font-family:inherit}
-.tb-btn:hover{background:var(--bg-btn-hover)}
-.tb-btn.active{background:var(--bg-btn-active);color:var(--text-btn-active);border-color:var(--bg-btn-active);font-weight:700}
-
-/* LAYOUT */
-#main{display:flex;flex:1;overflow:hidden;min-height:0}
-
-/* SIDEBAR */
-#sidebar{width:190px;background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
-.sb-sec{padding:8px 8px 4px}
-.sb-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
-.shape-btn{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;background:var(--bg-main);border:1px solid var(--border);border-radius:5px;color:var(--text-main);cursor:grab;font-size:11px;margin-bottom:4px;text-align:left;transition:.12s;font-family:inherit}
-.shape-btn:hover{background:var(--bg-btn);border-color:var(--text-muted)}
-.shape-icon{width:34px;height:22px;flex-shrink:0}
-
-/* CANVAS */
-#canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg-main);min-width:0}
-#grid-svg{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
-#main-svg{position:absolute;top:0;left:0;cursor:default;overflow:visible;transform-origin:0 0;}
-
-/* PROPS */
-#props{width:220px;background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:10px;display:flex;flex-direction:column;gap:0;transition:margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);}
-#props.closed{margin-right:-222px;}
-.props-toggle{width:16px;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-weight:700;font-size:12px;user-select:none;transition:background 0.2s,color 0.2s;flex-shrink:0;z-index:10;}
-.props-toggle:hover{background:var(--border-hover);color:var(--text-main);}
-#props h3{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
-.pr{margin-bottom:7px}
-.pr label{font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px}
-.pr input,.pr select,.pr textarea{width:100%;background:var(--bg-main);border:1px solid var(--border);color:var(--text-main);border-radius:4px;padding:4px 6px;font-size:11px;font-family:inherit}
-.pr input:focus,.pr select:focus,.pr textarea:focus{outline:none;border-color:var(--accent)}
-.pr textarea{resize:vertical;min-height:90px;line-height:1.5}
-.pr-hint{font-size:9px;color:var(--border-hover);margin-top:2px}
-.pbtn{width:100%;padding:5px;border-radius:4px;border:none;cursor:pointer;font-size:11px;font-weight:700;margin-top:3px;font-family:inherit}
-.pbtn.danger{background:var(--danger);color:var(--text-btn-active)}
-.pbtn.primary{background:var(--accent);color:var(--text-btn-active)}
-.empty-msg{font-size:11px;color:var(--border-hover);text-align:center;padding-top:20px}
-.card-row{display:flex;gap:6px}
-.card-row .pr{flex:1}
-/* legend box */
-#legend{background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:7px 8px;margin-bottom:8px}
-#legend .leg-title{font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:5px}
-.leg-item{display:flex;align-items:center;gap:5px;margin-bottom:3px;font-size:10px;color:var(--text-legend)}
-.leg-line{height:2px;width:28px;background:var(--text-muted)}
-.leg-line.dashed{background:repeating-linear-gradient(90deg,var(--text-muted) 0,var(--text-muted) 4px,transparent 4px,transparent 8px)}
-
-/* STATUS */
-#statusbar{background:var(--bg-panel);border-top:1px solid var(--border);padding:3px 10px;font-size:10px;color:var(--text-muted);display:flex;gap:14px;flex-shrink:0}
-</style>
-</head>
-<body>
-
-<div id="toolbar">
-  <span class="logo">⬡ ER Editor</span>
-  <div class="tb-group">
-    <button class="tb-btn active" id="btn-select" onclick="setTool('select')">▲ Select</button>
-    <button class="tb-btn" id="btn-connect" onclick="setTool('connect')">→ Connect</button>
-    <button class="tb-btn" id="btn-pan" onclick="setTool('pan')">✥ Pan</button>
-  </div>
-  <div class="tb-group">
-    <button class="tb-btn" onclick="undo()">↩ Undo</button>
-    <button class="tb-btn" onclick="deleteSelected()">✕ Delete</button>
-  </div>
-  <div class="tb-group">
-    <button class="tb-btn" onclick="zoom1(1.2)">＋</button>
-    <button class="tb-btn" onclick="zoom1(1/1.2)">－</button>
-    <button class="tb-btn" onclick="fitView()">Fit</button>
-  </div>
-  <div class="tb-group">
-    <button class="tb-btn" onclick="toggleTheme()">🌓 Theme</button>
-  </div>
-  <div class="tb-group">
-    <button class="tb-btn" onclick="loadSample()">🏨 Hotel Sample</button>
-    <button class="tb-btn" onclick="clearAll()">Clear</button>
-    <button class="tb-btn" onclick="doExport()">↓ Export SVG</button>
-  </div>
-</div>
-
-<div id="main">
-  <!-- SIDEBAR -->
-  <div id="sidebar">
-    <div class="sb-sec">
-      <div class="sb-title">Entities</div>
-      <button class="shape-btn" data-type="entity">
-        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="1" y="1" width="32" height="20" fill="#1a4480" stroke="#89b4fa" stroke-width="1.5" rx="1"/><rect x="1" y="1" width="32" height="9" fill="#1a4480" rx="1"/><text x="17" y="8" text-anchor="middle" font-size="5.5" fill="#fff" font-weight="700" font-family="Segoe UI,sans-serif">ENTITY</text><line x1="1" y1="10" x2="33" y2="10" stroke="#89b4fa" stroke-width="0.8"/><text x="5" y="16" font-size="4.5" fill="#89b4fa" font-family="Segoe UI,sans-serif">• PK_attr</text><text x="5" y="20.5" font-size="4.5" fill="#89b4fa" font-family="Segoe UI,sans-serif">• attribute</text></svg>
-        Strong Entity
-      </button>
-      <button class="shape-btn" data-type="weak_entity">
-        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="0" y="0" width="34" height="22" fill="none" stroke="#1a6b3a" stroke-width="1" rx="1"/><rect x="2" y="2" width="30" height="18" fill="#1a6b3a" stroke="#1a6b3a" stroke-width="1.5" rx="1"/><rect x="2" y="2" width="30" height="9" fill="#155228" rx="1"/><text x="17" y="8" text-anchor="middle" font-size="5" fill="#aef2c0" font-weight="700" font-family="Segoe UI,sans-serif">WEAK</text><line x1="2" y1="11" x2="32" y2="11" stroke="#1a6b3a" stroke-width="0.8"/><text x="5" y="16.5" font-size="4.5" fill="#aef2c0" font-family="Segoe UI,sans-serif">• partial_key</text></svg>
-        Weak Entity
-      </button>
-    </div>
-    <div class="sb-sec">
-      <div class="sb-title">Relationships</div>
-      <button class="shape-btn" data-type="relationship">
-        <svg class="shape-icon" viewBox="0 0 34 22"><polygon points="17,1 33,11 17,21 1,11" fill="#fef3e2" stroke="#854f0b" stroke-width="1.5"/><text x="17" y="13.5" text-anchor="middle" font-size="5.5" fill="#5b3a00" font-weight="700" font-family="Segoe UI,sans-serif">HAS</text></svg>
-        Relationship
-      </button>
-      <button class="shape-btn" data-type="id_relationship">
-        <svg class="shape-icon" viewBox="0 0 34 22"><polygon points="17,1 33,11 17,21 1,11" fill="#eaf3de" stroke="#639922" stroke-width="1.5"/><polygon points="17,4 30,11 17,18 4,11" fill="none" stroke="#639922" stroke-width="1"/><text x="17" y="13.5" text-anchor="middle" font-size="5" fill="#3b5e0a" font-weight="700" font-family="Segoe UI,sans-serif">ID REL</text></svg>
-        Identifying Rel.
-      </button>
-    </div>
-    <div class="sb-sec">
-      <div class="sb-title">Attributes</div>
-      <button class="shape-btn" data-type="attribute">
-        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#2d2580" font-family="Segoe UI,sans-serif">attribute</text></svg>
-        Attribute
-      </button>
-      <button class="shape-btn" data-type="pk_attribute">
-        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#ddeeff" stroke="#1a4480" stroke-width="1.5"/><ellipse cx="17" cy="11" rx="12" ry="6" fill="none" stroke="#1a4480" stroke-width="1"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#1a4480" font-weight="700" font-family="Segoe UI,sans-serif" text-decoration="underline">PK attr</text></svg>
-        PK Attribute
-      </button>
-      <button class="shape-btn" data-type="derived">
-        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5" stroke-dasharray="4 2"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#2d2580" font-family="Segoe UI,sans-serif">derived</text></svg>
-        Derived Attr.
-      </button>
-      <button class="shape-btn" data-type="multivalued">
-        <svg class="shape-icon" viewBox="0 0 34 22"><ellipse cx="17" cy="11" rx="16" ry="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/><ellipse cx="17" cy="11" rx="12" ry="6" fill="none" stroke="#534ab7" stroke-width="1"/><text x="17" y="13" text-anchor="middle" font-size="5" fill="#2d2580" font-family="Segoe UI,sans-serif">multi</text></svg>
-        Multivalued
-      </button>
-    </div>
-    <div class="sb-sec">
-      <div class="sb-title">Other</div>
-      <button class="shape-btn" data-type="note">
-        <svg class="shape-icon" viewBox="0 0 34 22"><rect x="1" y="1" width="32" height="20" fill="#2a2a3e" stroke="#6c7086" stroke-width="1" stroke-dasharray="4 2" rx="2"/><text x="17" y="13" text-anchor="middle" font-size="5.5" fill="#6c7086" font-family="Segoe UI,sans-serif">note text</text></svg>
-        Note / Label
-      </button>
-    </div>
-  </div>
-
-  <!-- CANVAS -->
-  <div id="canvas-wrap">
-    <svg id="grid-svg"><defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#2a2a3d" stroke-width="0.6"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/></svg>
-    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1,2 L8,5 L1,8" fill="none" stroke="#6c7086" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>
-      </defs>
-      <g id="edges-g"></g>
-      <g id="nodes-g"></g>
-    </svg>
-  </div>
-
-  <!-- PROPS -->
-  <div class="props-toggle" onclick="toggleProps()" id="props-toggle">&gt;</div>
-  <div id="props">
-    <h3>Properties</h3>
-    <div id="props-body"><p class="empty-msg">Click a shape to edit it.<br><br>Double-click to rename.</p></div>
-
-    <!-- LEGEND always visible at bottom -->
-    <div style="flex:1"></div>
-    <div id="legend">
-      <div class="leg-title">Cardinality Guide</div>
-      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">1:1</div> One-to-One</div>
-      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">1:N</div> One-to-Many</div>
-      <div class="leg-item"><div style="font-size:13px;font-weight:700;color:#cdd6f4;width:28px;text-align:center">M:N</div> Many-to-Many</div>
-      <div style="height:6px"></div>
-      <div class="leg-title">Line Types</div>
-      <div class="leg-item"><div class="leg-line"></div> Regular</div>
-      <div class="leg-item"><div class="leg-line dashed"></div> Identifying</div>
-      <div style="height:6px"></div>
-      <div class="leg-title">Shapes</div>
-      <div class="leg-item"><svg width="28" height="14"><rect x="1" y="1" width="26" height="12" fill="none" stroke="#89b4fa" stroke-width="1.5"/></svg> Entity</div>
-      <div class="leg-item"><svg width="28" height="14"><rect x="0" y="0" width="28" height="14" fill="none" stroke="#1a6b3a" stroke-width="1"/><rect x="2" y="2" width="24" height="10" fill="none" stroke="#1a6b3a" stroke-width="1"/></svg> Weak Entity</div>
-      <div class="leg-item"><svg width="28" height="14"><polygon points="14,1 27,7 14,13 1,7" fill="none" stroke="#854f0b" stroke-width="1.5"/></svg> Relationship</div>
-      <div class="leg-item"><svg width="28" height="14"><polygon points="14,1 27,7 14,13 1,7" fill="none" stroke="#639922" stroke-width="1.5"/><polygon points="14,3 25,7 14,11 3,7" fill="none" stroke="#639922" stroke-width="1"/></svg> Identifying Rel.</div>
-      <div class="leg-item"><svg width="28" height="14"><ellipse cx="14" cy="7" rx="13" ry="6" fill="none" stroke="#534ab7" stroke-width="1.2"/></svg> Attribute</div>
-      <div class="leg-item"><svg width="28" height="14"><ellipse cx="14" cy="7" rx="13" ry="6" fill="none" stroke="#1a4480" stroke-width="1.5"/><ellipse cx="14" cy="7" rx="9" ry="4" fill="none" stroke="#1a4480" stroke-width="1"/></svg> PK Attribute</div>
-    </div>
-  </div>
-</div>
-
-<div id="statusbar">
-  <span id="st-tool">Tool: Select</span>
-  <span id="st-nodes">Nodes: 0</span>
-  <span id="st-edges">Edges: 0</span>
-  <span id="st-zoom">Zoom: 100%</span>
-  <span style="margin-left:auto">Drag shapes from sidebar • C=Connect • Del=Delete • Space=Pan • Dbl-click=Rename</span>
-</div>
-
-<script>
 // ── STATE ──────────────────────────────────────────────────────────────────────
 let nodes=[], edges=[], sel=null, tool='select';
 let vx=100, vy=80, vz=1;
@@ -231,6 +6,8 @@ let isDrag=false, dragS={x:0,y:0}, dragO={x:0,y:0};
 let cxStart=null;
 let hist=[], histIdx=-1;
 let uid=1;
+let dirty=false;   // tracks unsaved changes
+let lastSavedSnapshot='';  // JSON of last saved state
 
 const SVG=document.getElementById('main-svg');
 const NG=document.getElementById('nodes-g');
@@ -281,6 +58,7 @@ const THEMES = {
 let currentTheme = 'dark';
 let DEFS = THEMES.dark.defs;
 
+// ── THEME ─────────────────────────────────────────────────────────────────────
 function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', currentTheme);
@@ -289,6 +67,7 @@ function toggleTheme() {
   renderAll();
 }
 
+// ── PROPS TOGGLE ──────────────────────────────────────────────────────────────
 function toggleProps() {
   const p = document.getElementById('props');
   const t = document.getElementById('props-toggle');
@@ -506,7 +285,7 @@ function renderEdge(edge){
     'stroke-dasharray':isId?'8 4':'none'});
   g.appendChild(ln);
 
-  // cardinality labels — centered
+  // cardinality labels — near diamond
   let cText='';
   if(edge.card1&&edge.card2) cText=edge.card1+':'+edge.card2;
   else if(edge.card1) cText=edge.card1;
@@ -661,8 +440,8 @@ function showEdgeProps(edge){
         <option value="true"${edge.dashed?' selected':''}>Dashed (identifying)</option>
       </select>
     </div>
-    <div style="background:#1e1e2e;border:1px solid #313244;border-radius:5px;padding:8px;margin-bottom:8px;font-size:10px;color:#a6adc8">
-      <b style="color:#cdd6f4">Cardinality guide:</b><br>
+    <div style="background:var(--bg-main);border:1px solid var(--border);border-radius:5px;padding:8px;margin-bottom:8px;font-size:10px;color:var(--text-legend)">
+      <b style="color:var(--text-main)">Cardinality guide:</b><br>
       <b>1:1</b> — One booking has one guest<br>
       <b>1:N</b> — One room type has many units<br>
       <b>M:N</b> — Students enroll in many subjects
@@ -689,9 +468,91 @@ function deleteSelected(){
 function saveH(){
   const s=JSON.stringify({nodes,edges});
   hist=hist.slice(0,histIdx+1); hist.push(s); histIdx=hist.length-1;
+  markDirty();
 }
 function undo(){
-  if(histIdx>0){histIdx--; const s=JSON.parse(hist[histIdx]); nodes=s.nodes; edges=s.edges; sel=null; renderAll();}
+  if(histIdx>0){histIdx--; const s=JSON.parse(hist[histIdx]); nodes=s.nodes; edges=s.edges; sel=null; renderAll(); markDirty();}
+}
+
+// ── DIRTY TRACKING ────────────────────────────────────────────────────────────
+function markDirty(){
+  const current = JSON.stringify({nodes,edges});
+  dirty = current !== lastSavedSnapshot;
+  updateTitle();
+}
+
+function updateTitle(){
+  const base = 'Chen ER Diagram Editor';
+  document.title = dirty ? '● ' + base + ' (unsaved)' : base;
+}
+
+// ── SAVE / LOAD (JSON) ────────────────────────────────────────────────────────
+function saveProject(){
+  const data = JSON.stringify({nodes, edges, uid, theme: currentTheme}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'er_diagram.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  lastSavedSnapshot = JSON.stringify({nodes,edges});
+  dirty = false;
+  updateTitle();
+}
+
+function openProject(){
+  document.getElementById('file-input').click();
+}
+
+function handleFileLoad(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      const data = JSON.parse(ev.target.result);
+      if(data.nodes && data.edges){
+        nodes = data.nodes;
+        edges = data.edges;
+        if(data.uid) uid = data.uid;
+        if(data.theme && THEMES[data.theme]){
+          currentTheme = data.theme;
+          document.documentElement.setAttribute('data-theme', currentTheme);
+          DEFS = THEMES[currentTheme].defs;
+          document.querySelector('#grid-svg').innerHTML = `<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="${THEMES[currentTheme].gridLine}" stroke-width="0.6"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/>`;
+        }
+        sel = null;
+        hist = []; histIdx = -1;
+        saveH();
+        lastSavedSnapshot = JSON.stringify({nodes,edges});
+        dirty = false;
+        updateTitle();
+        renderAll();
+        fitView();
+      } else {
+        alert('Invalid file: missing nodes or edges data.');
+      }
+    } catch(err){
+      alert('Error reading file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  // reset input so same file can be loaded again
+  e.target.value = '';
+}
+
+function newProject(){
+  if(dirty){
+    const choice = confirm('You have unsaved changes. Do you want to discard them and start a new project?');
+    if(!choice) return;
+  }
+  nodes = []; edges = []; sel = null; uid = 1;
+  hist = []; histIdx = -1;
+  saveH();
+  lastSavedSnapshot = JSON.stringify({nodes,edges});
+  dirty = false;
+  updateTitle();
+  renderAll();
 }
 
 // ── CLEAR ──────────────────────────────────────────────────────────────────────
@@ -716,8 +577,17 @@ window.addEventListener('keydown',e=>{
   if(e.key==='c'||e.key==='C') setTool('connect');
   if(e.key===' '){e.preventDefault(); setTool('pan');}
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault(); undo();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault(); saveProject();}
 });
 window.addEventListener('keyup',e=>{if(e.key===' ') setTool('select');});
+
+// ── UNSAVED CHANGES WARNING ───────────────────────────────────────────────────
+window.addEventListener('beforeunload', e=>{
+  if(dirty){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 // ── SIDEBAR DRAG ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.shape-btn[data-type]').forEach(btn=>{
@@ -734,6 +604,9 @@ document.querySelectorAll('.shape-btn[data-type]').forEach(btn=>{
     window.addEventListener('mouseup',onUp);
   });
 });
+
+// ── FILE INPUT LISTENER ───────────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', handleFileLoad);
 
 // ── HOTEL SAMPLE ──────────────────────────────────────────────────────────────
 function loadSample(){
@@ -816,11 +689,11 @@ function loadSample(){
     {id:'e12',from:'r6',to:'s7',card1:'',card2:'N',dashed:false},
   ];
   saveH(); renderAll(); fitView();
+  lastSavedSnapshot = JSON.stringify({nodes,edges});
+  dirty = false;
+  updateTitle();
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
 SVG.setAttribute('width',4000); SVG.setAttribute('height',3000);
 saveH(); applyT(); loadSample();
-</script>
-</body>
-</html>
