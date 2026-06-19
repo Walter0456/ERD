@@ -31,6 +31,7 @@
     <button class="tb-btn" onclick="newProject()">📄 New</button>
     <button class="tb-btn" onclick="openProject()">📂 Open</button>
     <button class="tb-btn" onclick="saveProject()">💾 Save</button>
+    <button class="tb-btn" onclick="downloadProject()">📥 Download JSON</button>
   </div>
   <div class="tb-group">
     <button class="tb-btn" onclick="loadSample()">🏨 Hotel Sample</button>
@@ -105,6 +106,7 @@
       </defs>
       <g id="edges-g"></g>
       <g id="nodes-g"></g>
+      <rect id="sel-box" display="none" fill="rgba(137, 180, 250, 0.2)" stroke="#89b4fa" stroke-width="1.5" stroke-dasharray="4 2" pointer-events="none"></rect>
     </svg>
   </div>
 

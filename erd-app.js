@@ -1,8 +1,9 @@
 // ── STATE ──────────────────────────────────────────────────────────────────────
-let nodes=[], edges=[], sel=null, tool='select';
+let nodes=[], edges=[], sel=null, multiSel=[], tool='select';
 let vx=100, vy=80, vz=1;
 let isPan=false, panS={x:0,y:0}, panO={x:0,y:0};
-let isDrag=false, dragS={x:0,y:0}, dragO={x:0,y:0};
+let isDrag=false, dragS={x:0,y:0}, dragO={};
+let isBoxSelect=false, boxStart={x:0,y:0};
 let cxStart=null;
 let hist=[], histIdx=-1;
 let uid=1;
@@ -13,6 +14,7 @@ const SVG=document.getElementById('main-svg');
 const NG=document.getElementById('nodes-g');
 const EG=document.getElementById('edges-g');
 const wrap=document.getElementById('canvas-wrap');
+const selBox=document.getElementById('sel-box');
 
 const THEMES = {
   dark: {
@@ -137,13 +139,22 @@ function setTool(t){
   if(t!=='connect') cxStart=null;
 }
 
-// ── PAN / DRAG ─────────────────────────────────────────────────────────────────
+// ── PAN / DRAG / BOX SELECT ────────────────────────────────────────────────────
 function handleDown(e) {
   if (e.type === 'mousedown' && e.button !== 0 && !e.ctrlKey) return;
   const pos = getPos(e);
   if(tool==='pan' || (e.ctrlKey && e.type === 'mousedown')){
     isPan=true; panS={x:pos.x, y:pos.y}; panO={x:vx, y:vy};
     if(e.cancelable) e.preventDefault();
+  } else if(tool === 'select' && (e.target===wrap||e.target===SVG||e.target.tagName==='svg')){
+    isBoxSelect = true;
+    boxStart = toCanvas(pos.x, pos.y);
+    setSel(null);
+    selBox.setAttribute('x', boxStart.x);
+    selBox.setAttribute('y', boxStart.y);
+    selBox.setAttribute('width', 0);
+    selBox.setAttribute('height', 0);
+    selBox.removeAttribute('display');
   } else if(e.target===wrap||e.target===SVG||e.target.tagName==='svg'){
     setSel(null);
   }
@@ -151,15 +162,59 @@ function handleDown(e) {
 function handleMove(e) {
   const pos = getPos(e);
   if(isPan){vx=panO.x+(pos.x-panS.x); vy=panO.y+(pos.y-panS.y); applyT();}
-  if(isDrag&&sel){
-    const n=nodes.find(n=>n.id===sel);
-    if(n){n.x=dragO.x+(pos.x-dragS.x)/vz; n.y=dragO.y+(pos.y-dragS.y)/vz; renderAll();}
+  else if(isBoxSelect){
+    const cur = toCanvas(pos.x, pos.y);
+    const x = Math.min(boxStart.x, cur.x);
+    const y = Math.min(boxStart.y, cur.y);
+    const w = Math.abs(cur.x - boxStart.x);
+    const h = Math.abs(cur.y - boxStart.y);
+    selBox.setAttribute('x', x);
+    selBox.setAttribute('y', y);
+    selBox.setAttribute('width', w);
+    selBox.setAttribute('height', h);
+    if(e.cancelable) e.preventDefault();
+  }
+  else if(isDrag && (sel || multiSel.length > 0)){
+    const targets = multiSel.length > 0 ? multiSel : [sel];
+    targets.forEach(id => {
+      const n = nodes.find(nn=>nn.id===id);
+      if(n && dragO[id]){
+        n.x = dragO[id].x + (pos.x - dragS.x)/vz;
+        n.y = dragO[id].y + (pos.y - dragS.y)/vz;
+      }
+    });
+    renderAll();
     if(e.cancelable) e.preventDefault(); // prevent scrolling while dragging
   }
 }
 function handleUp(e) {
   if(isDrag) saveH();
-  isPan=false; isDrag=false;
+  if(isBoxSelect) {
+    const bx = parseFloat(selBox.getAttribute('x'));
+    const by = parseFloat(selBox.getAttribute('y'));
+    const bw = parseFloat(selBox.getAttribute('width'));
+    const bh = parseFloat(selBox.getAttribute('height'));
+    selBox.setAttribute('display', 'none');
+    
+    // find intersections
+    multiSel = nodes.filter(n => {
+      const def = DEFS[n.type];
+      let nw = def.w || (def.rx*2);
+      let nh = def.h || (def.ry*2);
+      const nx = n.x - nw/2;
+      const ny = n.y - nh/2;
+      return !(nx > bx+bw || nx+nw < bx || ny > by+bh || ny+nh < by);
+    }).map(n => n.id);
+    
+    if(multiSel.length > 1) {
+      setSel(multiSel[0], true); // true = keep multiSel
+    } else if(multiSel.length === 1) {
+      setSel(multiSel[0]);
+    } else {
+      setSel(null);
+    }
+  }
+  isPan=false; isDrag=false; isBoxSelect=false;
 }
 
 wrap.addEventListener('mousedown', handleDown);
@@ -222,7 +277,8 @@ function nodeSize(node){
 function renderNode(node){
   const th = THEMES[currentTheme];
   const d=DEFS[node.type]||DEFS.entity;
-  const g=se('g',{'class':'node-g'+(sel===node.id?' sel':''),'data-id':node.id});
+  const isSel = sel === node.id || multiSel.includes(node.id);
+  const g=se('g',{'class':'node-g'+(isSel?' sel':''),'data-id':node.id});
   const {w,h}=nodeSize(node);
 
   if(d.type==='rect'||d.type==='note'){
@@ -232,7 +288,7 @@ function renderNode(node){
       g.appendChild(se('rect',{x:x-4,y:y-4,width:w+8,height:h+8,rx:3,fill:'none',stroke:d.stroke,'stroke-width':1.5,'class':'nb'}));
     }
     // main box
-    const box=se('rect',{x,y,width:w,height:h,rx:2,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,'stroke-width':sel===node.id?2.5:2,'class':'nb','stroke-dasharray':d.dash?'6 3':'none'});
+    const box=se('rect',{x,y,width:w,height:h,rx:2,fill:d.fill,stroke:isSel?th.selStroke:d.stroke,'stroke-width':isSel?2.5:2,'class':'nb','stroke-dasharray':d.dash?'6 3':'none'});
     g.appendChild(box);
 
     if(d.type==='rect'){
@@ -278,7 +334,7 @@ function renderNode(node){
       const op=`${node.x},${node.y-hh-5} ${node.x+hw+7},${node.y} ${node.x},${node.y+hh+5} ${node.x-hw-7},${node.y}`;
       g.appendChild(se('polygon',{points:op,fill:'none',stroke:d.stroke,'stroke-width':1.5}));
     }
-    g.appendChild(se('polygon',{points:pts,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,'stroke-width':sel===node.id?2.5:2,'class':'nb'}));
+    g.appendChild(se('polygon',{points:pts,fill:d.fill,stroke:isSel?th.selStroke:d.stroke,'stroke-width':isSel?2.5:2,'class':'nb'}));
     const tit=se('text',{x:node.x,y:node.y,'text-anchor':'middle','dominant-baseline':'central','font-size':11,'font-weight':700,fill:d.tc,'font-family':'Segoe UI,sans-serif'});
     tit.textContent=node.label;
     g.appendChild(tit);
@@ -286,8 +342,8 @@ function renderNode(node){
     // ellipse
     const rx=node.rx??60, ry=node.ry??20;
     if(d.dbl) g.appendChild(se('ellipse',{cx:node.x,cy:node.y,rx:rx+4,ry:ry+4,fill:'none',stroke:d.stroke,'stroke-width':1.2}));
-    g.appendChild(se('ellipse',{cx:node.x,cy:node.y,rx,ry,fill:d.fill,stroke:sel===node.id?th.selStroke:d.stroke,
-      'stroke-width':sel===node.id?2.5:1.5,'class':'nb','stroke-dasharray':d.dash?'5 3':'none'}));
+    g.appendChild(se('ellipse',{cx:node.x,cy:node.y,rx,ry,fill:d.fill,stroke:isSel?th.selStroke:d.stroke,
+      'stroke-width':isSel?2.5:1.5,'class':'nb','stroke-dasharray':d.dash?'5 3':'none'}));
     const tit=se('text',{x:node.x,y:node.y,'text-anchor':'middle','dominant-baseline':'central','font-size':10,
       fill:d.tc,'font-weight':d.ul?700:400,'text-decoration':d.ul?'underline':'none','font-family':'Segoe UI,sans-serif'});
     tit.textContent=node.label;
@@ -348,8 +404,18 @@ function renderEdge(edge){
 }
 
 // ── SELECTION ──────────────────────────────────────────────────────────────────
-function setSel(id){
+function setSel(id, skipMultiReset=false){
+  if(!skipMultiReset){
+    if(id) multiSel = [];
+    else multiSel = [];
+  }
   sel=id; renderAll();
+  
+  if(multiSel.length > 1) {
+    document.getElementById('props-body').innerHTML=`<p class="empty-msg">${multiSel.length} items selected.<br><br>Drag them to move.</p><button class="pbtn danger" style="margin-top:20px" onclick="deleteSelected()">Delete Selected</button>`;
+    return;
+  }
+  
   if(!id){document.getElementById('props-body').innerHTML='<p class="empty-msg">Click a shape to edit it.<br><br>Double-click to rename.</p>'; return;}
   const node=nodes.find(n=>n.id===id);
   const edge=edges.find(e=>e.id===id);
@@ -370,9 +436,20 @@ function onNodeDown(e,node){
     }
     return;
   }
-  setSel(node.id);
+  if(!multiSel.includes(node.id)){
+    setSel(node.id);
+  } else {
+    // clicking an already selected node in a multi-selection
+    if(multiSel.length === 1) setSel(node.id);
+  }
   const pos=getPos(e);
-  isDrag=true; dragS={x:pos.x,y:pos.y}; dragO={x:node.x,y:node.y};
+  isDrag=true; dragS={x:pos.x,y:pos.y};
+  dragO={};
+  const targets = multiSel.length > 0 ? multiSel : [node.id];
+  targets.forEach(id => {
+    const n = nodes.find(nn=>nn.id===id);
+    if(n) dragO[id] = {x: n.x, y: n.y};
+  });
 }
 
 // ── PROPS: NODE ────────────────────────────────────────────────────────────────
@@ -494,10 +571,19 @@ function setEdgeProp(id,key,val){
 
 // ── DELETE ─────────────────────────────────────────────────────────────────────
 function deleteSelected(){
-  if(!sel) return;
-  nodes=nodes.filter(n=>n.id!==sel);
-  edges=edges.filter(e=>e.id!==sel&&e.from!==sel&&e.to!==sel);
-  sel=null; saveH(); renderAll();
+  if(multiSel.length > 0) {
+    nodes = nodes.filter(n => !multiSel.includes(n.id));
+    edges = edges.filter(e => !multiSel.includes(e.from) && !multiSel.includes(e.to));
+    multiSel = [];
+    sel = null;
+  } else if(sel) {
+    nodes=nodes.filter(n=>n.id!==sel);
+    edges=edges.filter(e=>e.id!==sel&&e.from!==sel&&e.to!==sel);
+    sel=null; 
+  } else {
+    return;
+  }
+  saveH(); renderAll();
   document.getElementById('props-body').innerHTML='<p class="empty-msg">Click a shape to edit it.</p>';
 }
 
@@ -523,8 +609,16 @@ function updateTitle(){
   document.title = dirty ? '● ' + base + ' (unsaved)' : base;
 }
 
-// ── SAVE / LOAD (JSON) ────────────────────────────────────────────────────────
+// ── SAVE / LOAD / DOWNLOAD ───────────────────────────────────────────────────
 function saveProject(){
+  const data = JSON.stringify({nodes, edges, uid, theme: currentTheme});
+  localStorage.setItem('erd_saved_project', data);
+  lastSavedSnapshot = JSON.stringify({nodes,edges});
+  dirty = false;
+  updateTitle();
+}
+
+function downloadProject(){
   const data = JSON.stringify({nodes, edges, uid, theme: currentTheme}, null, 2);
   const blob = new Blob([data], {type:'application/json'});
   const a = document.createElement('a');
@@ -532,9 +626,6 @@ function saveProject(){
   a.download = 'er_diagram.json';
   a.click();
   URL.revokeObjectURL(a.href);
-  lastSavedSnapshot = JSON.stringify({nodes,edges});
-  dirty = false;
-  updateTitle();
 }
 
 function openProject(){
@@ -796,4 +887,30 @@ function loadSample(){
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
 SVG.setAttribute('width',4000); SVG.setAttribute('height',3000);
-saveH(); applyT(); loadSample();
+const saved = localStorage.getItem('erd_saved_project');
+if(saved){
+  try {
+    const data = JSON.parse(saved);
+    if(data.nodes && data.edges){
+      nodes = data.nodes;
+      edges = data.edges;
+      if(data.uid) uid = data.uid;
+      if(data.theme && THEMES[data.theme]){
+        currentTheme = data.theme;
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        DEFS = THEMES[currentTheme].defs;
+        document.querySelector('#grid-svg').innerHTML = `<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="${THEMES[currentTheme].gridLine}" stroke-width="0.6"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/>`;
+      }
+      saveH(); renderAll(); fitView();
+      lastSavedSnapshot = JSON.stringify({nodes,edges});
+      dirty = false;
+      updateTitle();
+    } else {
+      loadSample();
+    }
+  } catch(e) {
+    loadSample();
+  }
+} else {
+  saveH(); applyT(); loadSample();
+}
